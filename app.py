@@ -9,7 +9,6 @@ import cv2
 # -----------------------------
 # Load model
 # -----------------------------
-@st.cache_resource
 def load_model():
     return tf.keras.models.load_model('vggface_model_20251028_144939.h5')
 
