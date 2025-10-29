@@ -3,12 +3,13 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
-import dlib
+import mediapipe as mp
 import cv2
 
 # -----------------------------
 # Load model
 # -----------------------------
+
 def load_model():
     return tf.keras.models.load_model('vggface_model_20251028_144939.h5')
 
@@ -18,47 +19,49 @@ model = load_model()
 class_names = ['Complete', 'Mild', 'Moderate', 'Near Normal', 'Normal', 'Severe']
 
 # -----------------------------
-# Inisialisasi detektor wajah dlib
+# Inisialisasi deteksi wajah dengan MediaPipe
 # -----------------------------
-face_detector = dlib.get_frontal_face_detector()
+mp_face_detection = mp.solutions.face_detection
+face_detector = mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5)
 
-def crop_face_dlib(image_pil, margin=40):
+def crop_face_mediapipe(image_pil, margin=40):
     """
-    Deteksi wajah dengan dlib dan crop area wajah.
+    Deteksi wajah dengan MediaPipe dan crop area wajah.
     """
     img = np.array(image_pil)
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    faces = face_detector(gray)
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    results = face_detector.process(img_rgb)
 
-    if len(faces) == 0:
+    if not results.detections:
         st.warning("⚠️ No face detected — using full image.")
         return image_pil
 
-    # Ambil wajah pertama yang terdeteksi
-    face = faces[0]
-    x1, y1, x2, y2 = face.left(), face.top(), face.right(), face.bottom()
+    detection = results.detections[0]
+    bbox = detection.location_data.relative_bounding_box
+    h, w, _ = img.shape
 
-    # Tambahkan margin agar crop tidak terlalu ketat
-    x1 = max(0, x1 - margin)
-    y1 = max(0, y1 - margin)
-    x2 = min(img.shape[1], x2 + margin)
-    y2 = min(img.shape[0], y2 + margin)
+    x1 = int(bbox.xmin * w) - margin
+    y1 = int(bbox.ymin * h) - margin
+    x2 = int((bbox.xmin + bbox.width) * w) + margin
+    y2 = int((bbox.ymin + bbox.height) * h) + margin
+
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(w, x2)
+    y2 = min(h, y2)
 
     cropped_face = img[y1:y2, x1:x2]
     return Image.fromarray(cropped_face)
 
 # -----------------------------
-# Normalisasi (pengganti preprocess_input)
+# Normalisasi gambar
 # -----------------------------
 normalization_layer = tf.keras.layers.Rescaling(1./255)
 
 def preprocess_image(img_pil):
-    """
-    Ubah gambar menjadi array, resize ke 224x224, dan normalisasi.
-    """
     img = img_pil.resize((224, 224))
     img_array = image.img_to_array(img)
-    img_array = normalization_layer(img_array)  # Normalisasi ke [0,1]
+    img_array = normalization_layer(img_array)
     img_array = np.expand_dims(img_array, axis=0)
     return img_array
 
@@ -74,7 +77,7 @@ def predict_image(img_pil):
 # -----------------------------
 # UI Streamlit
 # -----------------------------
-st.title("Face Paralysis Detection (with dlib Face Cropping)")
+st.title("Face Paralysis Detection (MediaPipe Face Crop)")
 st.write("Upload or capture an image, and classify the face according to the **eFace Scale**:")
 st.markdown("**Classes:** Complete · Mild · Moderate · Near Normal · Normal · Severe")
 
@@ -96,7 +99,7 @@ if image_source:
     st.image(image_source, caption="Original Image", use_container_width=True)
 
     if st.button("Predict"):
-        cropped_face = crop_face_dlib(image_source)
+        cropped_face = crop_face_mediapipe(image_source)
         st.image(cropped_face, caption="Cropped Face", use_container_width=True)
 
         label = predict_image(cropped_face)
