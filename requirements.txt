@@ -1,0 +1,5 @@
+streamlit>=1.30.0
+tensorflow
+numpy>=1.21.0
+pillow>=9.0.0
+matplotlib>=3.5.0
