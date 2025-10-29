@@ -1,5 +1,7 @@
 streamlit>=1.30.0
-tensorflow
+tensorflow>=2.10.0
 numpy>=1.21.0
 pillow>=9.0.0
 matplotlib>=3.5.0
+opencv-python>=4.7.0
+dlib>=19.24.2
