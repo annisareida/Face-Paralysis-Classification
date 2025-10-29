@@ -14,14 +14,25 @@ def load_model():
 
 model = load_model()
 
-# Kelas berdasarkan skala eFace
+# Daftar kelas berdasarkan skala eFace
 class_names = ['Complete', 'Mild', 'Moderate', 'Near Normal', 'Normal', 'Severe']
+
+# -----------------------------
+# Fungsi crop tengah
+# -----------------------------
+def center_crop(img_pil, size=224):
+    width, height = img_pil.size
+    left = (width - size) // 2
+    top = (height - size) // 2
+    right = left + size
+    bottom = top + size
+    return img_pil.crop((left, top, right, bottom))
 
 # -----------------------------
 # Fungsi prediksi
 # -----------------------------
 def predict_image(img_pil):
-    img = img_pil.resize((224, 224))
+    img = center_crop(img_pil, size=224)
     img_array = image.img_to_array(img)
     img_array = np.expand_dims(img_array, axis=0)
     img_array = preprocess_input(img_array)
@@ -35,29 +46,45 @@ def predict_image(img_pil):
 # -----------------------------
 # UI Streamlit
 # -----------------------------
-st.title("Face Paralysis Detection")
-st.write("Upload an image or use your webcam to classify face according to **eFace Scale**: "
-         "**Complete, Mild, Moderate, Near Normal, Normal, Severe**.")
+st.title("Face Paralysis Detection (eFace Scale Classification)")
+st.write(
+    "Upload an image or use your webcam to classify facial paralysis level based on the **eFace Scale**:"
+)
+st.markdown(
+    "**Classes:** Complete · Mild · Moderate · Near Normal · Normal · Severe"
+)
+st.markdown(
+    "📌 **Note:** Ensure the image clearly shows the facial region, centered in the frame. "
+    "The system automatically crops the center 224×224 pixels before classification."
+)
 
-# Pilihan sumber input
+# -----------------------------
+# Pilih sumber gambar
+# -----------------------------
 input_type = st.radio("Select input method:", ['Upload Image', 'Use Webcam'])
 
 image_source = None
 if input_type == 'Upload Image':
-    uploaded_file = st.file_uploader("Upload an image...", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader(
+        "Upload an image (face centered)...", type=["jpg", "jpeg", "png"]
+    )
     if uploaded_file:
         image_source = Image.open(uploaded_file).convert('RGB')
+
 elif input_type == 'Use Webcam':
-    webcam_image = st.camera_input("Take a photo")
+    webcam_image = st.camera_input("Take a photo (face centered in frame)")
     if webcam_image:
         image_source = Image.open(webcam_image).convert('RGB')
 
 # -----------------------------
-# Tampilkan gambar & hasil prediksi
+# Proses prediksi dan hasil
 # -----------------------------
 if image_source:
-    st.image(image_source, caption="Input Image", use_container_width=True)
+    st.image(image_source, caption="Original Image", use_container_width=True)
 
     if st.button("Predict"):
+        cropped_image = center_crop(image_source, 224)
+        st.image(cropped_image, caption="Cropped 224x224 Center", use_container_width=False)
+
         label = predict_image(image_source)
         st.success(f"Predicted Class: **{label}**")
