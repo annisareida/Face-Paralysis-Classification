@@ -8,7 +8,6 @@ from mtcnn import MTCNN  # untuk deteksi wajah
 # -----------------------------
 # Load model
 # -----------------------------
-
 def load_model():
     return tf.keras.models.load_model('vggface_model_20251028_144939.h5')
 
@@ -66,36 +65,26 @@ def predict_image(img_pil):
     prediction = model.predict(img_array)
     predicted_index = np.argmax(prediction[0])
     return class_names[predicted_index]
+
 # -----------------------------
 # UI Streamlit
 # -----------------------------
 st.title("Face Paralysis Detection (with Face Cropping)")
-st.write("Upload an image or use your webcam to classify face according to **eFace Scale**: "
+st.write("Upload an image to classify facial paralysis according to the **eFace Scale**: "
          "**Complete, Mild, Moderate, Near Normal, Normal, Severe**.")
 
-# Pilihan sumber input
-input_type = st.radio("Select input method:", ['Upload Image', 'Use Webcam'])
-
-image_source = None
-if input_type == 'Upload Image':
-    uploaded_file = st.file_uploader("Upload an image...", type=["jpg", "jpeg", "png"])
-    if uploaded_file:
-        image_source = Image.open(uploaded_file).convert('RGB')
-elif input_type == 'Use Webcam':
-    webcam_image = st.camera_input("Take a photo")
-    if webcam_image:
-        image_source = Image.open(webcam_image).convert('RGB')
-
 # -----------------------------
-# Tampilkan gambar & hasil prediksi
+# Upload Gambar
 # -----------------------------
-if image_source:
+uploaded_file = st.file_uploader("Upload an image...", type=["jpg", "jpeg", "png"])
+
+if uploaded_file:
+    image_source = Image.open(uploaded_file).convert('RGB')
     st.image(image_source, caption="Original Input", use_container_width=True)
 
     if st.button("Predict"):
         # Crop wajah sebelum klasifikasi
         cropped_face = crop_face(image_source)
-
         st.image(cropped_face, caption="Detected Face", use_container_width=True)
 
         # Prediksi kelas wajah hasil crop
