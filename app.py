@@ -69,7 +69,7 @@ def predict_image(img_pil):
 # -----------------------------
 # UI Streamlit
 # -----------------------------
-st.title("Face Paralysis Detection (with Face Cropping)")
+st.title("Face Paralysis Classification")
 st.write("Upload an image to classify facial paralysis according to the **eFace Scale**: "
          "**Complete, Mild, Moderate, Near Normal, Normal, Severe**.")
 
