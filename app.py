@@ -1,3 +1,8 @@
+# PERBAIKAN 1: Tambahkan 'import os' dan paksa penggunaan CPU.
+# Ini harus menjadi baris PERTAMA sebelum mengimpor TensorFlow.
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
 import streamlit as st
 import numpy as np
 from PIL import Image
@@ -6,13 +11,24 @@ from tensorflow.keras.preprocessing import image
 from mtcnn import MTCNN  # untuk deteksi wajah
 
 # -----------------------------
-# Load model
+# Load model & detector (DENGAN CACHING)
 # -----------------------------
-def load_model():
+
+# PERBAIKAN 2: Gunakan @st.cache_resource agar model tidak di-load ulang
+# setiap kali ada interaksi UI. Ini meningkatkan performa secara drastis.
+@st.cache_resource
+def load_model_cached():
+    """Loads the Keras model from disk."""
     return tf.keras.models.load_model('vggface_model_20251028_144939.h5')
 
-model = load_model()
-detector = MTCNN()  # inisialisasi detektor wajah
+@st.cache_resource
+def load_detector_cached():
+    """Initializes the MTCNN face detector."""
+    return MTCNN()
+
+# Load model dan detector menggunakan fungsi caching
+model = load_model_cached()
+detector = load_detector_cached()
 
 # Kelas berdasarkan skala eFace
 class_names = ['Complete', 'Mild', 'Moderate', 'Near Normal', 'Normal', 'Severe']
@@ -23,14 +39,16 @@ class_names = ['Complete', 'Mild', 'Moderate', 'Near Normal', 'Normal', 'Severe'
 def crop_face(image_pil, margin=40):
     """
     Deteksi wajah dengan MTCNN dan crop area wajah dengan margin.
-    Jika tidak ditemukan wajah, mengembalikan gambar asli.
+    
+    PERBAIKAN 3: Jika tidak ditemukan wajah, kembalikan None.
+    Ini akan mencegah aplikasi memprediksi gambar penuh (full image).
     """
     img_array = np.array(image_pil)
     detections = detector.detect_faces(img_array)
 
     if len(detections) == 0:
-        st.warning("No face detected — using full image.")
-        return image_pil
+        st.warning("Wajah tidak terdeteksi. Tidak dapat melanjutkan klasifikasi.")
+        return None  # <-- PERBAIKAN: Kembalikan None, bukan gambar asli
 
     # Ambil wajah pertama yang terdeteksi
     x, y, w, h = detections[0]['box']
@@ -48,6 +66,7 @@ def crop_face(image_pil, margin=40):
 # -----------------------------
 # Normalisasi gambar
 # -----------------------------
+# (Tidak perlu diubah, ini sudah benar)
 normalization_layer = tf.keras.layers.Rescaling(1./255)
 
 def preprocess_image(img_pil):
@@ -60,6 +79,7 @@ def preprocess_image(img_pil):
 # -----------------------------
 # Fungsi prediksi
 # -----------------------------
+# (Tidak perlu diubah, ini sudah benar)
 def predict_image(img_pil):
     img_array = preprocess_image(img_pil)
     prediction = model.predict(img_array)
@@ -69,24 +89,34 @@ def predict_image(img_pil):
 # -----------------------------
 # UI Streamlit
 # -----------------------------
-st.title("Face Paralysis Classification")
-st.write("Upload an image to classify facial paralysis according to the **eFace Scale**: "
+st.title("Klasifikasi Kelumpuhan Wajah (eFace Scale)")
+st.write("Unggah gambar untuk mengklasifikasikan kelumpuhan wajah berdasarkan **Skala eFace**: "
          "**Complete, Mild, Moderate, Near Normal, Normal, Severe**.")
 
 # -----------------------------
 # Upload Gambar
 # -----------------------------
-uploaded_file = st.file_uploader("Upload an image...", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Pilih gambar...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
     image_source = Image.open(uploaded_file).convert('RGB')
-    st.image(image_source, caption="Original Input", use_container_width=True)
+    st.image(image_source, caption="Gambar Asli", use_container_width=True)
 
-    if st.button("Predict"):
-        # Crop wajah sebelum klasifikasi
-        cropped_face = crop_face(image_source)
-        st.image(cropped_face, caption="Detected Face", use_container_width=True)
+    if st.button("Mulai Prediksi"):
+        # PERBAIKAN: Tambahkan spinner agar pengguna tahu aplikasi sedang bekerja
+        with st.spinner("Mendeteksi wajah dan melakukan prediksi..."):
+            
+            # 1. Coba crop wajah
+            cropped_face = crop_face(image_source)
 
-        # Prediksi kelas wajah hasil crop
-        label = predict_image(cropped_face)
-        st.success(f"Predicted Class: **{label}**")
+            # PERBAIKAN 3 (Lanjutan):
+            # Hanya lanjutkan jika crop_face() berhasil mengembalikan gambar (bukan None)
+            if cropped_face:
+                st.image(cropped_face, caption="Wajah Terdeteksi", use_container_width=True)
+
+                # 2. Prediksi kelas wajah hasil crop
+                label = predict_image(cropped_face)
+                st.success(f"Hasil Prediksi: **{label}**")
+            else:
+                # Pesan ini akan muncul jika 'crop_face' mengembalikan None
+                st.error("Proses dibatalkan karena tidak ada wajah yang terdeteksi.")
