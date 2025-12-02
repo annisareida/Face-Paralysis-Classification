@@ -102,7 +102,7 @@ if uploaded_file:
     image_source = Image.open(uploaded_file).convert('RGB')
     st.image(image_source, caption="Gambar Asli", use_container_width=True)
 
-    if st.button("Mulai Prediksi"):
+    if st.button("Predict"):
         # PERBAIKAN: Tambahkan spinner agar pengguna tahu aplikasi sedang bekerja
         with st.spinner("Mendeteksi wajah dan melakukan prediksi..."):
             
