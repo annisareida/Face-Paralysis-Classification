@@ -1,6 +1,5 @@
-# PERBAIKAN 1: Tambahkan 'import os' dan paksa penggunaan CPU.
-# Ini harus menjadi baris PERTAMA sebelum mengimpor TensorFlow.
 import os
+import time  # Tambahkan library time
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 import streamlit as st
@@ -8,115 +7,210 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
-from mtcnn import MTCNN  # untuk deteksi wajah
+from mtcnn import MTCNN
 
-# -----------------------------
-# Load model & detector (DENGAN CACHING)
-# -----------------------------
+# ==========================================
+# 1. CLASS FACE DETECTOR
+# ==========================================
+class FaceDetector:
+    def __init__(self):
+        self.detector = self._load_detector()
 
-# PERBAIKAN 2: Gunakan @st.cache_resource agar model tidak di-load ulang
-# setiap kali ada interaksi UI. Ini meningkatkan performa secara drastis.
-@st.cache_resource
-def load_model_cached():
-    """Loads the Keras model from disk."""
-    return tf.keras.models.load_model('vggface_model_20251028_144939.h5')
+    @staticmethod
+    @st.cache_resource
+    def _load_detector():
+        return MTCNN()
 
-@st.cache_resource
-def load_detector_cached():
-    """Initializes the MTCNN face detector."""
-    return MTCNN()
+    def crop_face(self, image_pil, margin=40):
+        img_array = np.array(image_pil)
+        detections = self.detector.detect_faces(img_array)
 
-# Load model dan detector menggunakan fungsi caching
-model = load_model_cached()
-detector = load_detector_cached()
+        if len(detections) == 0:
+            return None
 
-# Kelas berdasarkan skala eFace
-class_names = ['Complete', 'Mild', 'Moderate', 'Near Normal', 'Normal', 'Severe']
+        x, y, w, h = detections[0]['box']
+        x1 = max(0, x - margin)
+        y1 = max(0, y - margin)
+        x2 = min(img_array.shape[1], x + w + margin)
+        y2 = min(img_array.shape[0], y + h + margin)
 
-# -----------------------------
-# Fungsi deteksi dan crop wajah
-# -----------------------------
-def crop_face(image_pil, margin=40):
-    """
-    Deteksi wajah dengan MTCNN dan crop area wajah dengan margin.
-    
-    PERBAIKAN 3: Jika tidak ditemukan wajah, kembalikan None.
-    Ini akan mencegah aplikasi memprediksi gambar penuh (full image).
-    """
-    img_array = np.array(image_pil)
-    detections = detector.detect_faces(img_array)
+        cropped_face = img_array[y1:y2, x1:x2]
+        return Image.fromarray(cropped_face)
 
-    if len(detections) == 0:
-        st.warning("Wajah tidak terdeteksi. Tidak dapat melanjutkan klasifikasi.")
-        return None  # <-- PERBAIKAN: Kembalikan None, bukan gambar asli
+# ==========================================
+# 2. CLASS FACE CLASSIFIER
+# ==========================================
+class FaceClassifier:
+    def __init__(self, model_path):
+        self.model = self._load_model(model_path)
+        self.class_names = ['Complete', 'Mild', 'Moderate', 'Near Normal', 'Normal', 'Severe']
+        self.normalization_layer = tf.keras.layers.Rescaling(1./255)
 
-    # Ambil wajah pertama yang terdeteksi
-    x, y, w, h = detections[0]['box']
+    @staticmethod
+    @st.cache_resource
+    def _load_model(path):
+        return tf.keras.models.load_model(path)
 
-    # Tambahkan margin agar crop tidak terlalu ketat
-    x1 = max(0, x - margin)
-    y1 = max(0, y - margin)
-    x2 = min(img_array.shape[1], x + w + margin)
-    y2 = min(img_array.shape[0], y + h + margin)
+    def _preprocess_image(self, img_pil):
+        img = img_pil.resize((224, 224))
+        img_array = image.img_to_array(img)
+        img_array = self.normalization_layer(img_array)
+        img_array = np.expand_dims(img_array, axis=0)
+        return img_array
 
-    cropped_face = img_array[y1:y2, x1:x2]
-    cropped_pil = Image.fromarray(cropped_face)
-    return cropped_pil
+    def predict(self, img_pil):
+        img_array = self._preprocess_image(img_pil)
+        
+        # Simulasi waktu proses (opsional, hanya agar progress bar terlihat)
+        # time.sleep(0.5) 
+        
+        prediction = self.model.predict(img_array)
+        predicted_index = np.argmax(prediction[0])
+        confidence = np.max(prediction[0]) * 100 # Hitung confidence score
+        return self.class_names[predicted_index], confidence
 
-# -----------------------------
-# Normalisasi gambar
-# -----------------------------
-# (Tidak perlu diubah, ini sudah benar)
-normalization_layer = tf.keras.layers.Rescaling(1./255)
+# ==========================================
+# 3. CLASS FACE PARALYSIS APP (UI dipercantik)
+# ==========================================
+class FaceParalysisApp:
+    def __init__(self):
+        # Konfigurasi Halaman (Harus di baris pertama dalam init)
+        st.set_page_config(
+            page_title="Sistem Deteksi Kelumpuhan Wajah",
+            page_icon="🏥",
+            layout="wide"  # Menggunakan layout lebar
+        )
+        
+        self.detector = FaceDetector()
+        # Pastikan path model benar
+        self.classifier = FaceClassifier('vggface_model_20251028_144939.h5')
 
-def preprocess_image(img_pil):
-    img = img_pil.resize((224, 224))
-    img_array = image.img_to_array(img)
-    img_array = normalization_layer(img_array)
-    img_array = np.expand_dims(img_array, axis=0)
-    return img_array
-
-# -----------------------------
-# Fungsi prediksi
-# -----------------------------
-# (Tidak perlu diubah, ini sudah benar)
-def predict_image(img_pil):
-    img_array = preprocess_image(img_pil)
-    prediction = model.predict(img_array)
-    predicted_index = np.argmax(prediction[0])
-    return class_names[predicted_index]
-
-# -----------------------------
-# UI Streamlit
-# -----------------------------
-st.title("Klasifikasi Kelumpuhan Wajah (eFace Scale)")
-st.write("Unggah gambar untuk mengklasifikasikan kelumpuhan wajah berdasarkan **Skala eFace**: "
-         "**Complete, Mild, Moderate, Near Normal, Normal, Severe**.")
-
-# -----------------------------
-# Upload Gambar
-# -----------------------------
-uploaded_file = st.file_uploader("Pilih gambar...", type=["jpg", "jpeg", "png"])
-
-if uploaded_file:
-    image_source = Image.open(uploaded_file).convert('RGB')
-    st.image(image_source, caption="Gambar Asli", use_container_width=True)
-
-    if st.button("Predict"):
-        # PERBAIKAN: Tambahkan spinner agar pengguna tahu aplikasi sedang bekerja
-        with st.spinner("Mendeteksi wajah dan melakukan prediksi..."):
+    def display_sidebar(self):
+        """Menampilkan instruksi di sidebar agar UI utama bersih"""
+        with st.sidebar:
+            st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=100)
+            st.title("Panduan Pengguna")
+            st.info(
+                """
+                1. **Upload** gambar wajah pasien.
+                2. Pastikan wajah terlihat **jelas** dan **fokus**.
+                3. Klik tombol **'Mulai Analisis'**.
+                4. Sistem akan mendeteksi wajah dan memberikan hasil klasifikasi.
+                """
+            )
+            st.warning("⚠️ Aplikasi ini adalah alat bantu diagnosis awal, bukan pengganti diagnosis dokter.")
             
-            # 1. Coba crop wajah
-            cropped_face = crop_face(image_source)
+            st.markdown("---")
+            st.caption("Skripsi Teknik Informatika 2025")
 
-            # PERBAIKAN 3 (Lanjutan):
-            # Hanya lanjutkan jika crop_face() berhasil mengembalikan gambar (bukan None)
+    def display_header(self):
+        st.markdown("<h1 style='text-align: center; color: #2E86C1;'>Klasifikasi Tingkat Kelumpuhan Wajah</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center;'>Menggunakan Arsitektur <b>VGG-Face</b> dengan Skala <b>eFACE</b></p>", unsafe_allow_html=True)
+        st.divider()
+
+    def handle_upload(self):
+        # Container untuk upload di tengah
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            uploaded_file = st.file_uploader("Unggah Citra Wajah (JPG/PNG)", type=["jpg", "jpeg", "png"])
+
+        if uploaded_file:
+            image_source = Image.open(uploaded_file).convert('RGB')
+            
+            # Tampilkan gambar asli di tengah sebelum diproses
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.image(image_source, caption="Preview Citra Asli", use_container_width=True)
+                
+                # Tombol besar di tengah
+                analyze_btn = st.button("🔍 Mulai Analisis", type="primary", use_container_width=True)
+
+            if analyze_btn:
+                self.process_image(image_source)
+
+    def process_image(self, image_source):
+        st.divider()
+        
+        # Mulai menghitung waktu
+        start_time = time.time()
+        
+        # Progress Bar untuk UX yang lebih baik
+        progress_text = "Sedang memproses citra..."
+        my_bar = st.progress(0, text=progress_text)
+
+        try:
+            # 1. Deteksi Wajah
+            my_bar.progress(30, text="Mendeteksi wajah...")
+            cropped_face = self.detector.crop_face(image_source)
+
             if cropped_face:
-                st.image(cropped_face, caption="Wajah Terdeteksi", use_container_width=True)
+                # 2. Klasifikasi
+                my_bar.progress(70, text="Menganalisis tingkat keparahan...")
+                label, confidence = self.classifier.predict(cropped_face)
+                
+                # Selesai menghitung waktu
+                end_time = time.time()
+                inference_time = end_time - start_time
+                
+                my_bar.progress(100, text="Selesai!")
+                time.sleep(0.5) # Jeda dikit biar user liat 100%
+                my_bar.empty() # Hilangkan progress bar
 
-                # 2. Prediksi kelas wajah hasil crop
-                label = predict_image(cropped_face)
-                st.success(f"Hasil Prediksi: **{label}**")
+                # TAMPILAN HASIL (Layout 2 Kolom)
+                self.show_results(cropped_face, label, confidence, inference_time)
+            
             else:
-                # Pesan ini akan muncul jika 'crop_face' mengembalikan None
-                st.error("Proses dibatalkan karena tidak ada wajah yang terdeteksi.")
+                my_bar.empty()
+                st.error("❌ Wajah tidak terdeteksi! Harap unggah foto dengan wajah yang jelas.")
+        
+        except Exception as e:
+            my_bar.empty()
+            st.error(f"Terjadi kesalahan: {e}")
+
+    def show_results(self, cropped_face, label, confidence, inference_time):
+        """Menampilkan hasil dengan layout kolom yang rapi"""
+        
+        col_img, col_result = st.columns([1, 1], gap="medium")
+
+        # Kolom Kiri: Gambar Hasil Crop
+        with col_img:
+            st.subheader("Wajah Terdeteksi")
+            st.image(cropped_face, use_container_width=True, caption="Region of Interest (ROI)")
+
+        # Kolom Kanan: Hasil Prediksi & Metrik
+        with col_result:
+            st.subheader("Hasil Diagnosis Sistem")
+            
+            # Kotak hasil utama
+            st.success(f"### Kategori: **{label}**")
+            
+            # Tampilkan Metrik Tambahan (Ini fitur barunya!)
+            m1, m2 = st.columns(2)
+            with m1:
+                st.metric(label="Akurasi Prediksi", value=f"{confidence:.2f}%")
+            with m2:
+                # Menampilkan Waktu Inferensi (sesuai saran teman Anda)
+                st.metric(label="Waktu Inferensi", value=f"{inference_time:.4f} detik", delta_color="off")
+
+            st.caption(f"Sistem mengklasifikasikan citra ini sebagai **{label}** dengan tingkat kepercayaan **{confidence:.2f}%** dalam waktu **{inference_time:.4f} detik**.")
+
+            # Expander untuk detail kelas (opsional, pemanis)
+            with st.expander("ℹ️ Tentang Kategori Ini"):
+                if label == "Normal":
+                    st.write("Wajah tampak simetris saat istirahat dan bergerak. Fungsi otot wajah normal.")
+                elif "Severe" in label or "Complete" in label:
+                    st.write("Terlihat asimetri yang signifikan. Kesulitan menutup mata atau menggerakkan mulut pada sisi yang terdampak.")
+                else:
+                    st.write(f"Tingkat kelumpuhan wajah kategori {label}. Disarankan konsultasi lebih lanjut dengan dokter.")
+
+    def run(self):
+        self.display_sidebar()
+        self.display_header()
+        self.handle_upload()
+
+# ==========================================
+# MAIN ENTRY POINT
+# ==========================================
+if __name__ == "__main__":
+    app = FaceParalysisApp()
+    app.run()
