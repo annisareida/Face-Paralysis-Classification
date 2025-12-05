@@ -170,12 +170,16 @@ class FaceParalysisApp:
     def show_results(self, cropped_face, label, confidence, inference_time):
         """Menampilkan hasil dengan layout kolom yang rapi"""
         
-        col_img, col_result = st.columns([1, 1], gap="medium")
+        # Mengubah rasio kolom agar gambar crop lebih kecil
+        # Sebelumnya [1, 1], sekarang [1, 2] (Kolom hasil lebih lebar, kolom gambar lebih sempit)
+        # Atau bisa pakai width=tertentu di st.image
+        col_img, col_result = st.columns([1, 2], gap="large")
 
-        # Kolom Kiri: Gambar Hasil Crop
+        # Kolom Kiri: Gambar Hasil Crop (Lebih Kecil)
         with col_img:
             st.subheader("Wajah Terdeteksi")
-            st.image(cropped_face, use_container_width=True, caption="Region of Interest (ROI)")
+            # Mengurangi width agar tidak memenuhi layar (misal 250px atau 300px)
+            st.image(cropped_face, width=250, caption="Region of Interest (ROI)")
 
         # Kolom Kanan: Hasil Prediksi & Metrik
         with col_result:
@@ -195,11 +199,19 @@ class FaceParalysisApp:
             st.caption(f"Sistem mengklasifikasikan citra ini sebagai **{label}** dengan tingkat kepercayaan **{confidence:.2f}%** dalam waktu **{inference_time:.4f} detik**.")
 
             # Expander untuk detail kelas (opsional, pemanis)
-            with st.expander("ℹ️ Tentang Kategori Ini"):
+            with st.expander("ℹ️ Tentang Kategori Ini", expanded=True):
                 if label == "Normal":
-                    st.write("Wajah tampak simetris saat istirahat dan bergerak. Fungsi otot wajah normal.")
-                elif "Severe" in label or "Complete" in label:
-                    st.write("Terlihat asimetri yang signifikan. Kesulitan menutup mata atau menggerakkan mulut pada sisi yang terdampak.")
+                    st.write("**Normal (96-100):** Fungsi wajah normal sepenuhnya. Simetris saat istirahat dan bergerak.")
+                elif label == "Near Normal":
+                    st.write("**Near Normal (91-95):** Sedikit kelemahan terlihat hanya pada inspeksi dekat. Simetris saat istirahat, sedikit asimetris saat bergerak.")
+                elif label == "Mild":
+                    st.write("**Mild (80-90):** Disfungsi ringan. Asimetri terlihat saat pergerakan, namun masih bisa menutup mata dengan usaha minimal.")
+                elif label == "Moderate":
+                    st.write("**Moderate (70-79):** Disfungsi sedang. Asimetri jelas terlihat. Mata mungkin tidak menutup sempurna tanpa usaha. Pergerakan dahi berkurang.")
+                elif label == "Severe":
+                    st.write("**Severe (60-69):** Disfungsi berat. Asimetri sangat jelas. Tidak ada pergerakan dahi. Mata tidak bisa menutup sempurna. Mulut sedikit bergerak.")
+                elif label == "Complete":
+                    st.write("**Complete (<60):** Kelumpuhan total. Tidak ada pergerakan otot wajah sama sekali. Wajah sangat asimetris.")
                 else:
                     st.write(f"Tingkat kelumpuhan wajah kategori {label}. Disarankan konsultasi lebih lanjut dengan dokter.")
 
