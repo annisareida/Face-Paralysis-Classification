@@ -66,8 +66,7 @@ class FaceClassifier:
         
         prediction = self.model.predict(img_array)
         predicted_index = np.argmax(prediction[0])
-        confidence = np.max(prediction[0]) * 100 # Hitung confidence score
-        return self.class_names[predicted_index], confidence
+        return self.class_names[predicted_index]
 
 # ==========================================
 # 3. CLASS FACE PARALYSIS APP (UI dipercantik)
@@ -94,7 +93,7 @@ class FaceParalysisApp:
                 """
                 1. **Upload** gambar wajah pasien.
                 2. Pastikan wajah terlihat **jelas** dan **fokus**.
-                3. Klik tombol **'Mulai Analisis'**.
+                3. Klik tombol **'Predict'**.
                 4. Sistem akan mendeteksi wajah dan memberikan hasil klasifikasi.
                 """
             )
@@ -123,7 +122,7 @@ class FaceParalysisApp:
                 st.image(image_source, caption="Preview Citra Asli", use_container_width=True)
                 
                 # Tombol besar di tengah
-                analyze_btn = st.button("🔍 Mulai Analisis", type="primary", use_container_width=True)
+                analyze_btn = st.button("🔍 Predict", type="primary", use_container_width=True)
 
             if analyze_btn:
                 self.process_image(image_source)
@@ -146,7 +145,7 @@ class FaceParalysisApp:
             if cropped_face:
                 # 2. Klasifikasi
                 my_bar.progress(70, text="Menganalisis tingkat keparahan...")
-                label, confidence = self.classifier.predict(cropped_face)
+                label = self.classifier.predict(cropped_face)
                 
                 # Selesai menghitung waktu
                 end_time = time.time()
@@ -157,7 +156,7 @@ class FaceParalysisApp:
                 my_bar.empty() # Hilangkan progress bar
 
                 # TAMPILAN HASIL (Layout 2 Kolom)
-                self.show_results(cropped_face, label, confidence, inference_time)
+                self.show_results(cropped_face, label, inference_time)
             
             else:
                 my_bar.empty()
@@ -167,7 +166,7 @@ class FaceParalysisApp:
             my_bar.empty()
             st.error(f"Terjadi kesalahan: {e}")
 
-    def show_results(self, cropped_face, label, confidence, inference_time):
+    def show_results(self, cropped_face, label, inference_time):
         """Menampilkan hasil dengan layout kolom yang rapi"""
         
         # Mengubah rasio kolom agar gambar crop lebih kecil
@@ -188,30 +187,25 @@ class FaceParalysisApp:
             # Kotak hasil utama
             st.success(f"### Kategori: **{label}**")
             
-            # Tampilkan Metrik Tambahan (Ini fitur barunya!)
-            m1, m2 = st.columns(2)
-            with m1:
-                st.metric(label="Akurasi Prediksi", value=f"{confidence:.2f}%")
-            with m2:
-                # Menampilkan Waktu Inferensi (sesuai saran teman Anda)
-                st.metric(label="Waktu Inferensi", value=f"{inference_time:.4f} detik", delta_color="off")
+            # Tampilkan Metrik Waktu Inferensi
+            st.metric(label="Waktu Inferensi", value=f"{inference_time:.4f} detik", delta_color="off")
 
-            st.caption(f"Sistem mengklasifikasikan citra ini sebagai **{label}** dengan tingkat kepercayaan **{confidence:.2f}%** dalam waktu **{inference_time:.4f} detik**.")
+            st.caption(f"Sistem mengklasifikasikan citra ini sebagai **{label}** dalam waktu **{inference_time:.4f} detik**.")
 
             # Expander untuk detail kelas (opsional, pemanis)
             with st.expander("ℹ️ Tentang Kategori Ini", expanded=True):
                 if label == "Normal":
-                    st.write("**Normal (96-100):** Fungsi wajah normal sepenuhnya. Simetris saat istirahat dan bergerak.")
+                    st.write("**Normal:** Fungsi wajah normal sepenuhnya. Simetris saat istirahat dan bergerak.")
                 elif label == "Near Normal":
-                    st.write("**Near Normal (91-95):** Sedikit kelemahan terlihat hanya pada inspeksi dekat. Simetris saat istirahat, sedikit asimetris saat bergerak.")
+                    st.write("**Near Normal:** Sedikit kelemahan terlihat hanya pada inspeksi dekat. Simetris saat istirahat, sedikit asimetris saat bergerak.")
                 elif label == "Mild":
-                    st.write("**Mild (80-90):** Disfungsi ringan. Asimetri terlihat saat pergerakan, namun masih bisa menutup mata dengan usaha minimal.")
+                    st.write("**Mild:** Disfungsi ringan. Asimetri terlihat saat pergerakan, namun masih bisa menutup mata dengan usaha minimal.")
                 elif label == "Moderate":
-                    st.write("**Moderate (70-79):** Disfungsi sedang. Asimetri jelas terlihat. Mata mungkin tidak menutup sempurna tanpa usaha. Pergerakan dahi berkurang.")
+                    st.write("**Moderate:** Disfungsi sedang. Asimetri jelas terlihat. Mata mungkin tidak menutup sempurna tanpa usaha. Pergerakan dahi berkurang.")
                 elif label == "Severe":
-                    st.write("**Severe (60-69):** Disfungsi berat. Asimetri sangat jelas. Tidak ada pergerakan dahi. Mata tidak bisa menutup sempurna. Mulut sedikit bergerak.")
+                    st.write("**Severe:** Disfungsi berat. Asimetri sangat jelas. Tidak ada pergerakan dahi. Mata tidak bisa menutup sempurna. Mulut sedikit bergerak.")
                 elif label == "Complete":
-                    st.write("**Complete (<60):** Kelumpuhan total. Tidak ada pergerakan otot wajah sama sekali. Wajah sangat asimetris.")
+                    st.write("**Complete:** Kelumpuhan total. Tidak ada pergerakan otot wajah sama sekali. Wajah sangat asimetris.")
                 else:
                     st.write(f"Tingkat kelumpuhan wajah kategori {label}. Disarankan konsultasi lebih lanjut dengan dokter.")
 
