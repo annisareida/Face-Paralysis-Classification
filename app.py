@@ -111,7 +111,7 @@ class FaceParalysisApp:
         # Container untuk upload di tengah
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            uploaded_file = st.file_uploader("Unggah Citra Wajah (JPG/PNG)", type=["jpg", "jpeg", "png"])
+            uploaded_file = st.file_uploader("Unggah Citra Wajah (JPG/PNG)", type=["jpg", "jpeg", "png", "bmp"])
 
         if uploaded_file:
             image_source = Image.open(uploaded_file).convert('RGB')
