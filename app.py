@@ -1,5 +1,8 @@
 import os
-import time  # Tambahkan library time
+import time
+import zipfile
+import io
+import pandas as pd # Tambahkan pandas untuk tabel hasil
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 import streamlit as st
@@ -22,20 +25,23 @@ class FaceDetector:
         return MTCNN()
 
     def crop_face(self, image_pil, margin=40):
-        img_array = np.array(image_pil)
-        detections = self.detector.detect_faces(img_array)
+        try:
+            img_array = np.array(image_pil)
+            detections = self.detector.detect_faces(img_array)
 
-        if len(detections) == 0:
+            if len(detections) == 0:
+                return None
+
+            x, y, w, h = detections[0]['box']
+            x1 = max(0, x - margin)
+            y1 = max(0, y - margin)
+            x2 = min(img_array.shape[1], x + w + margin)
+            y2 = min(img_array.shape[0], y + h + margin)
+
+            cropped_face = img_array[y1:y2, x1:x2]
+            return Image.fromarray(cropped_face)
+        except:
             return None
-
-        x, y, w, h = detections[0]['box']
-        x1 = max(0, x - margin)
-        y1 = max(0, y - margin)
-        x2 = min(img_array.shape[1], x + w + margin)
-        y2 = min(img_array.shape[0], y + h + margin)
-
-        cropped_face = img_array[y1:y2, x1:x2]
-        return Image.fromarray(cropped_face)
 
 # ==========================================
 # 2. CLASS FACE CLASSIFIER
@@ -60,154 +66,140 @@ class FaceClassifier:
 
     def predict(self, img_pil):
         img_array = self._preprocess_image(img_pil)
-        
-        # Simulasi waktu proses (opsional, hanya agar progress bar terlihat)
-        # time.sleep(0.5) 
-        
-        prediction = self.model.predict(img_array)
+        prediction = self.model.predict(img_array, verbose=0)
         predicted_index = np.argmax(prediction[0])
         return self.class_names[predicted_index]
 
 # ==========================================
-# 3. CLASS FACE PARALYSIS APP (UI dipercantik)
+# 3. CLASS FACE PARALYSIS APP (Batch Mode)
 # ==========================================
 class FaceParalysisApp:
     def __init__(self):
-        # Konfigurasi Halaman (Harus di baris pertama dalam init)
         st.set_page_config(
-            page_title="Sistem Deteksi Kelumpuhan Wajah",
+            page_title="Sistem Deteksi Kelumpuhan Wajah (Batch)",
             page_icon="🏥",
-            layout="wide"  # Menggunakan layout lebar
+            layout="wide"
         )
         
         self.detector = FaceDetector()
-        # Pastikan path model benar
+        # Ganti dengan path model Anda
         self.classifier = FaceClassifier('vggface_model_20251028_144939.h5')
 
     def display_sidebar(self):
-        """Menampilkan instruksi di sidebar agar UI utama bersih"""
         with st.sidebar:
             st.image("https://cdn-icons-png.flaticon.com/512/3004/3004458.png", width=100)
-            st.title("Panduan Pengguna")
+            st.title("Panduan Batch Upload")
             st.info(
                 """
-                1. **Upload** gambar wajah pasien.
-                2. Pastikan wajah terlihat **jelas** dan **fokus**.
-                3. Klik tombol **'Predict'**.
-                4. Sistem akan mendeteksi wajah dan memberikan hasil klasifikasi.
+                1. Siapkan file **ZIP** berisi kumpulan foto wajah (.jpg, .png).
+                2. Unggah file ZIP tersebut.
+                3. Klik tombol **'Mulai Prediksi Massal'**.
+                4. Sistem akan menghitung jumlah prediksi per kategori.
                 """
             )
-            st.warning("⚠️ Aplikasi ini adalah alat bantu diagnosis awal, bukan pengganti diagnosis dokter.")
-            
-            st.markdown("---")
-            st.caption("Skripsi Teknik Informatika 2025")
+            st.warning("⚠️ Pastikan foto di dalam ZIP memiliki pencahayaan yang cukup.")
 
     def display_header(self):
-        st.markdown("<h1 style='text-align: center; color: #2E86C1;'>Klasifikasi Tingkat Kelumpuhan Wajah</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center;'>Menggunakan Arsitektur <b>VGG-Face</b> dengan Skala <b>eFACE</b></p>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; color: #2E86C1;'>Batch Classification: Kelumpuhan Wajah</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center;'>Uji coba banyak gambar sekaligus menggunakan <b>VGG-Face</b></p>", unsafe_allow_html=True)
         st.divider()
 
     def handle_upload(self):
-        # Container untuk upload di tengah
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            uploaded_file = st.file_uploader("Unggah Citra Wajah (JPG/PNG)", type=["jpg", "jpeg", "png", "bmp"])
+            uploaded_zip = st.file_uploader("Unggah File ZIP (Kumpulan Gambar)", type=["zip"])
 
-        if uploaded_file:
-            image_source = Image.open(uploaded_file).convert('RGB')
-            
-            # Tampilkan gambar asli di tengah sebelum diproses
+        if uploaded_zip:
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
-                st.image(image_source, caption="Preview Citra Asli", use_container_width=True)
-                
-                # Tombol besar di tengah
-                analyze_btn = st.button("🔍 Predict", type="primary", use_container_width=True)
+                analyze_btn = st.button("🚀 Mulai Prediksi Massal", type="primary", use_container_width=True)
 
             if analyze_btn:
-                self.process_image(image_source)
+                self.process_zip(uploaded_zip)
 
-    def process_image(self, image_source):
-        st.divider()
+    def process_zip(self, uploaded_zip):
+        # Inisialisasi hitungan
+        results_count = {name: 0 for name in self.classifier.class_names}
+        results_count["Wajah Tidak Terdeteksi"] = 0
         
-        # Mulai menghitung waktu
-        start_time = time.time()
+        detail_list = [] # Untuk tabel detail per file
         
-        # Progress Bar untuk UX yang lebih baik
-        progress_text = "Sedang memproses citra..."
-        my_bar = st.progress(0, text=progress_text)
-
         try:
-            # 1. Deteksi Wajah
-            my_bar.progress(30, text="Mendeteksi wajah...")
-            cropped_face = self.detector.crop_face(image_source)
-
-            if cropped_face:
-                # 2. Klasifikasi
-                my_bar.progress(70, text="Menganalisis tingkat keparahan...")
-                label = self.classifier.predict(cropped_face)
+            with zipfile.ZipFile(uploaded_zip, "r") as z:
+                # Ambil daftar file yang valid (gambar saja)
+                file_list = [f for f in z.namelist() if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))]
+                total_files = len(file_list)
                 
-                # Selesai menghitung waktu
+                if total_files == 0:
+                    st.error("ZIP kosong atau tidak berisi file gambar yang didukung.")
+                    return
+
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                start_time = time.time()
+
+                for i, file_name in enumerate(file_list):
+                    # Update progress
+                    progress = (i + 1) / total_files
+                    progress_bar.progress(progress)
+                    status_text.text(f"Memproses {i+1}/{total_files}: {file_name}")
+
+                    # Baca gambar dari ZIP
+                    img_data = z.read(file_name)
+                    img_pil = Image.open(io.BytesIO(img_data)).convert('RGB')
+
+                    # Deteksi & Prediksi
+                    cropped_face = self.detector.crop_face(img_pil)
+                    
+                    if cropped_face:
+                        label = self.classifier.predict(cropped_face)
+                        results_count[label] += 1
+                        detail_list.append({"Nama File": file_name, "Hasil": label})
+                    else:
+                        results_count["Wajah Tidak Terdeteksi"] += 1
+                        detail_list.append({"Nama File": file_name, "Hasil": "Gagal Deteksi"})
+
                 end_time = time.time()
-                inference_time = end_time - start_time
+                total_duration = end_time - start_time
                 
-                my_bar.progress(100, text="Selesai!")
-                time.sleep(0.5) # Jeda dikit biar user liat 100%
-                my_bar.empty() # Hilangkan progress bar
+                progress_bar.empty()
+                status_text.empty()
+                
+                # TAMPILKAN HASIL AKHIR
+                self.show_batch_results(results_count, detail_list, total_files, total_duration)
 
-                # TAMPILAN HASIL (Layout 2 Kolom)
-                self.show_results(cropped_face, label, inference_time)
-            
-            else:
-                my_bar.empty()
-                st.error("❌ Wajah tidak terdeteksi! Harap unggah foto dengan wajah yang jelas.")
-        
         except Exception as e:
-            my_bar.empty()
-            st.error(f"Terjadi kesalahan: {e}")
+            st.error(f"Terjadi kesalahan saat mengekstrak ZIP: {e}")
 
-    def show_results(self, cropped_face, label, inference_time):
-        """Menampilkan hasil dengan layout kolom yang rapi"""
+    def show_batch_results(self, results_count, detail_list, total_files, duration):
+        st.success(f"✅ Pemrosesan Selesai dalam {duration:.2f} detik")
         
-        # Mengubah rasio kolom agar gambar crop lebih kecil
-        # Sebelumnya [1, 1], sekarang [1, 2] (Kolom hasil lebih lebar, kolom gambar lebih sempit)
-        # Atau bisa pakai width=tertentu di st.image
-        col_img, col_result = st.columns([1, 2], gap="large")
+        # Grid Dashboard
+        col_metric1, col_metric2, col_metric3 = st.columns(3)
+        col_metric1.metric("Total Gambar", total_files)
+        col_metric2.metric("Berhasil", total_files - results_count["Wajah Tidak Terdeteksi"])
+        col_metric3.metric("Gagal Deteksi", results_count["Wajah Tidak Terdeteksi"])
 
-        # Kolom Kiri: Gambar Hasil Crop (Lebih Kecil)
-        with col_img:
-            st.subheader("Wajah Terdeteksi")
-            # Mengurangi width agar tidak memenuhi layar (misal 250px atau 300px)
-            st.image(cropped_face, width=250, caption="Region of Interest (ROI)")
+        st.divider()
 
-        # Kolom Kanan: Hasil Prediksi & Metrik
-        with col_result:
-            st.subheader("Hasil Diagnosis Sistem")
-            
-            # Kotak hasil utama
-            st.success(f"### Kategori: **{label}**")
-            
-            # Tampilkan Metrik Waktu Inferensi
-            st.metric(label="Waktu Inferensi", value=f"{inference_time:.4f} detik", delta_color="off")
+        # Layout Hasil: Grafik dan Tabel
+        col_chart, col_table = st.columns([1, 1])
 
-            st.caption(f"Sistem mengklasifikasikan citra ini sebagai **{label}** dalam waktu **{inference_time:.4f} detik**.")
+        with col_chart:
+            st.subheader("📊 Grafik Distribusi Kelas")
+            # Konversi dict ke DataFrame untuk charting
+            df_chart = pd.DataFrame(list(results_count.items()), columns=['Kategori', 'Jumlah'])
+            st.bar_chart(df_chart.set_index('Kategori'))
 
-            # Expander untuk detail kelas (opsional, pemanis)
-            with st.expander("ℹ️ Tentang Kategori Ini", expanded=True):
-                if label == "Normal":
-                    st.write("**Normal:** Fungsi wajah normal sepenuhnya. Simetris saat istirahat dan bergerak.")
-                elif label == "Near Normal":
-                    st.write("**Near Normal:** Sedikit kelemahan terlihat hanya pada inspeksi dekat. Simetris saat istirahat, sedikit asimetris saat bergerak.")
-                elif label == "Mild":
-                    st.write("**Mild:** Disfungsi ringan. Asimetri terlihat saat pergerakan, namun masih bisa menutup mata dengan usaha minimal.")
-                elif label == "Moderate":
-                    st.write("**Moderate:** Disfungsi sedang. Asimetri jelas terlihat. Mata mungkin tidak menutup sempurna tanpa usaha. Pergerakan dahi berkurang.")
-                elif label == "Severe":
-                    st.write("**Severe:** Disfungsi berat. Asimetri sangat jelas. Tidak ada pergerakan dahi. Mata tidak bisa menutup sempurna. Mulut sedikit bergerak.")
-                elif label == "Complete":
-                    st.write("**Complete:** Kelumpuhan total. Tidak ada pergerakan otot wajah sama sekali. Wajah sangat asimetris.")
-                else:
-                    st.write(f"Tingkat kelumpuhan wajah kategori {label}. Disarankan konsultasi lebih lanjut dengan dokter.")
+        with col_table:
+            st.subheader("📋 Tabel Ringkasan")
+            st.table(df_chart)
+
+        # Expander untuk daftar detail semua file
+        with st.expander("🔍 Lihat Detail Per File"):
+            df_detail = pd.DataFrame(detail_list)
+            st.dataframe(df_detail, use_container_width=True)
 
     def run(self):
         self.display_sidebar()
