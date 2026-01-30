@@ -12,7 +12,8 @@ The model performs **multi-class classification into six severity levels based o
 ---
 
 ## 📊 Dataset Description
-- **Dataset source**: Private dataset from *Massachusetts Eye and Ear Infirmary (MEEI)*  
+- **Dataset source**: Private dataset from *Massachusetts Eye and Ear Infirmary (MEEI)*
+- **Reference**: Ali et al., IEEE Access (2023)
 - **Total samples**: **60 facial images**  
 - **Classification scale**: **eFACE (6-class classification)**  
 
@@ -56,6 +57,16 @@ https://face-paralysis-classification.streamlit.app/
 - **Model Architecture**: VGGFace (Transfer Learning)  
 - **Computer Vision**: CNN-based image classification  
 - **Deployment**: Streamlit  
+
+---
+
+## 📚 Dataset Reference
+If you use or refer to the dataset methodology, please cite:
+
+> Ali, W., Imran, M., Yaseen, M. U., Aurangzeb, K., Ashraf, N., & Aslam, S. (2023).  
+> *A transfer learning approach for facial paralysis severity detection*.  
+> **IEEE Access**, 11, 127492–127508.  
+> https://doi.org/10.1109/ACCESS.2023.3330076
 
 ---
 
