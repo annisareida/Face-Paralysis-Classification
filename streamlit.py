@@ -209,26 +209,19 @@ delta_color="off")
             # Expander untuk detail kelas (opsional, pemanis) 
             with st.expander("ℹ️ Tentang Kategori Ini", expanded=True): 
                 if label == "Normal": 
-                    st.write("**Normal:** Fungsi wajah normal sepenuhnya. Simetris saat 
-istirahat dan bergerak.") 
+                    st.write("**Normal:** Fungsi wajah normal sepenuhnya. Simetris saat istirahat dan bergerak.") 
                 elif label == "Near Normal": 
-                    st.write("**Near Normal:** Sedikit kelemahan terlihat hanya pada 
-inspeksi dekat. Simetris saat istirahat, sedikit asimetris saat bergerak.") 
+                    st.write("**Near Normal:** Sedikit kelemahan terlihat hanya pada inspeksi dekat. Simetris saat istirahat, sedikit asimetris saat bergerak.") 
                 elif label == "Mild": 
-                    st.write("**Mild:** Disfungsi ringan. Asimetri terlihat saat 
-pergerakan, namun masih bisa menutup mata dengan usaha minimal.") 
+                    st.write("**Mild:** Disfungsi ringan. Asimetri terlihat saat pergerakan, namun masih bisa menutup mata dengan usaha minimal.") 
                 elif label == "Moderate": 
-                    st.write("**Moderate:** Disfungsi sedang. Asimetri jelas terlihat. 
-Mata mungkin tidak menutup sempurna tanpa usaha. Pergerakan dahi berkurang.") 
+                    st.write("**Moderate:** Disfungsi sedang. Asimetri jelas terlihat. Mata mungkin tidak menutup sempurna tanpa usaha. Pergerakan dahi berkurang.") 
                 elif label == "Severe": 
-                    st.write("**Severe:** Disfungsi berat. Asimetri sangat jelas. Tidak ada 
-pergerakan dahi. Mata tidak bisa menutup sempurna. Mulut sedikit bergerak.") 
+                    st.write("**Severe:** Disfungsi berat. Asimetri sangat jelas. Tidak ada pergerakan dahi. Mata tidak bisa menutup sempurna. Mulut sedikit bergerak.") 
                 elif label == "Complete": 
-                    st.write("**Complete:** Kelumpuhan total. Tidak ada pergerakan otot 
-wajah sama sekali. Wajah sangat asimetris.") 
+                    st.write("**Complete:** Kelumpuhan total. Tidak ada pergerakan otot wajah sama sekali. Wajah sangat asimetris.") 
                 else: 
-                    st.write(f"Tingkat kelumpuhan wajah kategori {label}. Disarankan 
-konsultasi lebih lanjut dengan dokter.") 
+                    st.write(f"Tingkat kelumpuhan wajah kategori {label}. Disarankan konsultasi lebih lanjut dengan dokter.") 
  
     def run(self): 
         self.display_sidebar() 
