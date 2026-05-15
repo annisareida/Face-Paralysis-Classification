@@ -181,8 +181,7 @@ use_container_width=True)
         """Menampilkan hasil dengan layout kolom yang rapi""" 
          
         # Mengubah rasio kolom agar gambar crop lebih kecil 
-        # Sebelumnya [1, 1], sekarang [1, 2] (Kolom hasil lebih lebar, kolom gambar 
-lebih sempit) 
+        # Sebelumnya [1, 1], sekarang [1, 2] (Kolom hasil lebih lebar, kolom gambar lebih sempit) 
         # Atau bisa pakai width=tertentu di st.image 
         col_img, col_result = st.columns([1, 2], gap="large") 
  
