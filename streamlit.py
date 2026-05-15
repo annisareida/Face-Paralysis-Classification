@@ -171,8 +171,7 @@ use_container_width=True)
              
             else: 
                 my_bar.empty() 
-                st.error("  Wajah tidak terdeteksi! Harap unggah foto dengan wajah 
-yang jelas.") 
+                st.error("  Wajah tidak terdeteksi! Harap unggah foto dengan wajah yang jelas.") 
          
         except Exception as e: 
             my_bar.empty() 
