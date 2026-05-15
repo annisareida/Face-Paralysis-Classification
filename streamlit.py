@@ -109,8 +109,7 @@ width=100)
  
     def display_header(self): 
         st.markdown("<h1 style='text-align: center; color: #2E86C1;'>Klasifikasi Kelumpuhan Wajah</h1>", unsafe_allow_html=True) 
-        st.markdown("<p style='text-align: center;'>Menggunakan Arsitektur 
-<b>VGG-Face</b> dengan Skala <b>eFACE</b></p>", unsafe_allow_html=True) 
+        st.markdown("<p style='text-align: center;'>Menggunakan Arsitektur<b>VGG-Face</b> dengan Skala <b>eFACE</b></p>", unsafe_allow_html=True) 
         st.divider() 
  
     def handle_upload(self): 
