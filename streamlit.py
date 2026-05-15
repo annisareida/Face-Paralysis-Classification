@@ -202,8 +202,7 @@ use_container_width=True)
             st.metric(label="Waktu Inferensi", value=f"{inference_time:.4f} detik", 
 delta_color="off") 
  
-            st.caption(f"Sistem mengklasifikasikan citra ini sebagai **{label}** dalam 
-waktu **{inference_time:.4f} detik**.") 
+            st.caption(f"Sistem mengklasifikasikan citra ini sebagai **{label}** dalam waktu **{inference_time:.4f} detik**.") 
  
  
  
