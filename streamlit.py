@@ -102,8 +102,7 @@ width=100)
                 4. Sistem akan mendeteksi wajah dan memberikan hasil klasifikasi. 
                 """ 
             ) 
-            st.warning("    Aplikasi ini adalah alat bantu diagnosis awal, bukan 
-pengganti diagnosis dokter.") 
+            st.warning("Aplikasi ini adalah alat bantu diagnosis awal, bukan pengganti diagnosis dokter.") 
              
             st.markdown("---") 
             st.caption("Skripsi Teknik Informatika 2025") 
