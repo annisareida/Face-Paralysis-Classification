@@ -46,11 +46,6 @@ The model performs **multi-class classification into six severity levels based o
 
 ---
 
-## 🌐 Live Demo
-🔗 **Streamlit App**:  
-https://face-paralysis-classification.streamlit.app/
-
----
 
 ## 🛠️ Tech Stack
 - **Deep Learning Framework**: TensorFlow  
